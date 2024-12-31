@@ -1,34 +1,70 @@
-const express = require('express')
-const app = express()
-const dotenv = require("dotenv");
-
+// index.js
+const express = require('express');
+const app = express();
+const dotenv = require('dotenv');
 dotenv.config();
-const port = 3000
-
-
-app.use(express.urlencoded({ extended: true }));// for parsing application/x-www-form-urlencoded
 const mongoose = require("mongoose");
-//connection to db
-mongoose.set("useFindAndModify", false);
-mongoose.connect(process.env.DB_CONNECT, { useNewUrlParser: true }, () => {
-console.log("Connected to db!");
-app.listen(3000, () => console.log("Server Up and running"));
+const TodoTask = require("./models/TodoTask");
+
+app.use("/static", express.static('public'));
+
+app.use(express.urlencoded({ extended: true }));
+
+// Connection to db using async/await
+async function connectToDB() {
+    try {
+        await mongoose.connect(process.env.DB_CONNECT);
+        console.log("Connected to db!");
+        app.listen(3000, () => console.log("Server up and running"));
+    } catch (error) {
+        console.error("Database connection error:", error);
+    }
+}
+
+connectToDB();
+
+app.set('view engine', 'ejs'); // this is for using ejs template engine
+
+// GET METHOD
+app.get("/", async (req, res) => {
+    try {
+        const tasks = await TodoTask.find({})
+        res.render("todo.ejs", { todoTasks: tasks });
+
+    } catch (err) {
+        res.status(500).send("Error retrieving tasks");
+    }
+
 });
 
-app.set("view engine", "ejs"); // for rendering ejs files
-
-app.use("/static", express.static("public")); // for serving static files
-
-
-app.get('/', (req, res) => {
-    res.render("todo.ejs");  // for rendering the form
-})
-
-app.post('/',(req, res) => {
-    console.log(req.body);
+//UPDATE
+app.route("/edit/:id")
+    .get(async (req, res) => {
+        const id = req.params.id;
+        try {
+            const tasks = await TodoTask.find({});
+            res.render("todoEdit.ejs", { todoTasks: tasks, idTask: id });
+        } catch (err) {
+            res.status(500).send("Error retrieving tasks");
+        }
+    })
+    .post(async (req, res) => {
+        const id = req.params.id;
+        try {
+            await TodoTask.findByIdAndUpdate(id, { content: req.body.content });
+            res.redirect("/");
+        } catch (err) {
+            res.status(500).send("Error updating task");
+        }
     });
-    
 
-app.listen(port, () => {
-    console.log(`Example app listening on port http://localhost:${port}`)
-})
+//DELETE
+app.route("/remove/:id").get(async (req, res) => {
+    const id = req.params.id;
+    try {
+        await TodoTask.findByIdAndDelete(id);
+        res.redirect("/");
+    } catch (err) {
+        res.status(500).send(err);
+    }
+});
